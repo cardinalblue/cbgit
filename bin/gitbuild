@@ -1,0 +1,217 @@
+#!/usr/bin/env ruby
+
+require 'octokit'
+require 'git'
+require 'logger'
+
+require 'optparse'
+require 'pp'
+require 'json'
+
+OPTS = {
+  GITHUB_LOGIN:     ENV['GITHUB_LOGIN'],
+  GITHUB_PASSWORD:  ENV['GITHUB_PASSWORD'],
+
+  BASE_BRANCH:      'dev',
+  REMOTE:           'origin',
+
+  OCTOPUS_MERGE:    true,
+  BUILD_PREFIX:     'build_',
+  DO_PUSH:          true,
+  AFTER_MERGE:      false,
+}
+
+PULL_TAG        = /\#build\b/
+INFO_FILEPATH   = './config/gitbuild.txt'
+
+# --------------------------------------------------
+# Command line arguments
+
+OptionParser.new{ |op|
+  op.banner = "Creates a new branch, merging pull requests in GitHub marked with #{PULL_TAG}"
+  op.on('-l', '--login USERNAME',         'GitHub login name'                                        ) { |v|
+                                          OPTS[:GITHUB_LOGIN]     = v }
+  op.on('-p', '--password PASSWORD',      'GitHub login password'                                    ) { |v|
+                                          OPTS[:GITHUB_PASSWORD]  = v }
+  op.on('-b', '--basebranch BRANCHNAME',  "Branch to use as base (def #{OPTS[:BASE_BRANCH]})"        ) { |v|
+                                          OPTS[:BASE_BRANCH]      = v }
+  op.on('-r', '--remote REMOTENAME',      "Git remote used to find GitHub (def #{OPTS[:REMOTE]})"    ) { |v|
+                                          OPTS[:REMOTE]           = v }
+  op.on('-o', '--[no-]octopus',           "Use Git octopus merge (def #{OPTS[:OCTOPUS_MERGE]})"      ) { |v|
+                                          OPTS[:OCTOPUS_MERGE]    = v }
+  op.on('--build-prefix BUILDPREFIX',     "Name of branch created (def #{OPTS[:BUILD_PREFIX]}123)"   ) { |v|
+                                          OPTS[:BUILD_PREFIX]     = v }
+  op.on('--[no-]push',                    "Push results to remote (def #{OPTS[:DO_PUSH]}"            ) { |v|
+                                          OPTS[:DO_PUSH]          = v }
+  op.on('--after-merge',                  "Merge completed manually, do post (def #{OPTS[:AFTER_MERGE]}" ) { |v|
+                                          OPTS[:AFTER_MERGE]      = v }
+
+  # Help
+  op.on_tail("-h", "--help", "Show this message") do
+    puts op
+    exit
+  end
+}.parse!
+
+
+# --------------------------------------------------
+# Setup Git client
+
+@logger = Logger.new STDOUT
+@g      = Git.open '.', log: nil  # or @logger
+
+# --------------------------------------------------
+# Setup Octokit
+
+Octokit.configure do |config|
+  config.login    = OPTS[:GITHUB_LOGIN]    or raise 'No GitHub login given'
+  config.password = OPTS[:GITHUB_PASSWORD] or raise 'No GitHub password given'
+end
+stack = Faraday::Builder.new do |builder|
+  #builder.response :post
+  builder.use Octokit::Response::RaiseError
+  builder.adapter Faraday.default_adapter
+end
+Octokit.middleware = stack
+
+# --------------------------------------------------
+# Functions
+
+def git command, *args
+  @g.lib.send :command, command, args
+end
+
+def fetch_github_pulls repo=calculate_github_repo
+  # Access pull requests
+  @logger.debug "Fetching pull requests from #{repo}"
+  pulls = Octokit.pulls(repo, 'open')
+end
+
+def calculate_github_repo
+  # Figure out the repo user/name
+  remote = @g.remote OPTS[:REMOTE]
+  repo_user, repo_name = remote.url.split(':')[1].split(/[\/\.]/)
+  @logger.info "Extracted repo user '#{repo_user}' name '#{repo_name}' from remote '#{OPTS[:REMOTE]}' (#{remote.url})"
+  return "#{repo_user}/#{repo_name}"
+end
+
+def calculate_build_number
+  @g.branches.inject 0 do |build_number, branch|
+    if branch.name.start_with? OPTS[:BUILD_PREFIX]
+      n = branch.name[OPTS[:BUILD_PREFIX].length..-1].to_i
+      if n > build_number
+        build_number = n
+      end
+    end
+    build_number
+  end
+end
+
+# --------------------------------------------------
+# MAIN SCRIPT
+
+# First, got to base branch and pull it
+@g.checkout OPTS[:BASE_BRANCH]
+@g.pull OPTS[:REMOTE], OPTS[:BASE_BRANCH]
+
+begin
+
+  # Figure out branches we will merge, by looking for the magic tag
+  pulls = fetch_github_pulls
+  pulls = pulls.select{ |pull| pull.body.match PULL_TAG }
+  raise 'No pull requests to merge!' if pulls.empty?
+  brnames = pulls.map{ |b| b.head.ref }
+  puts "---- Found Github branches to build:\n#{brnames.join "\n" }"
+
+  unless OPTS[:AFTER_MERGE]
+
+    # Then create a new branch and switch to it
+    branch = @g.branch("tmp_#{rand 1_000_000_000_000}")
+    branch.checkout
+
+    # --------------------------------------------------------------------
+    # Do the merge
+    if OPTS[:OCTOPUS_MERGE]
+      puts "---- Merging branches via octopus:\n#{brnames.join "\n" }"
+      git :pull, OPTS[:REMOTE], *brnames
+    else
+      brnames.each do |brname|
+        puts "---- Merging branch: #{brname}"
+        @g.merge("#{OPTS[:REMOTE]}/#{brname}")
+
+        # Check for conflicts
+        conflicts = []
+        @g.each_conflict do |file,_,_|
+          conflicts += file
+        end
+        unless conflicts.empty?
+          puts "Conflicts merging #{branch.name}, exiting:\n#{conflicts.join(', ')}"
+          exit
+        end
+      end
+    end
+
+    # Done with merge
+    puts '!!!! Merged !!!!'
+
+  end
+
+  # --------------------------------------------------------------------
+  # Figure out build number
+  build_number = calculate_build_number
+  puts "---- Current build number is #{build_number}"
+
+  # Rename current branch to it
+  buildbranch = "#{OPTS[:BUILD_PREFIX]}#{build_number + 1}"
+  puts "---- Creating branch #{buildbranch}"
+  git :branch, '-m', buildbranch
+
+  # --------------------------------------------------------------------
+  # Save gitbuild info, writing a config file
+  info = {
+    branch:           buildbranch,
+    time:             Time.now,
+    github_login:     OPTS[:GITHUB_LOGIN],
+    commit: {
+      sha:            @g.log.first.sha,
+    },
+    pulls:            pulls.map{ |pull|
+      [
+          "\##{pull.number}",
+          pull.title,
+          pull.head.sha,
+          pull.head.date
+      ]
+    },
+    merges:           @g.log('-merges')[0..20].map{ |commit|
+      [
+          commit.date,
+          commit.sha,
+          commit.message
+      ]
+    }
+  }
+  File.open(INFO_FILEPATH, 'w') do |f|
+    f.write JSON.pretty_generate(info)
+  end
+  @g.add INFO_FILEPATH
+  @g.commit "added #{INFO_FILEPATH}"
+
+  # --------------------------------------------------------------------
+  # Push
+  if OPTS[:DO_PUSH]
+    puts "---- Pushing branch to #{OPTS[:REMOTE]}"
+    @g.lib.send :command, 'push', [ OPTS[:REMOTE], buildbranch, '--set-upstream']
+      # Hard to set arbitrary commands using Git client gem
+  end
+
+rescue
+
+  # Oops, failed somehow, delete temporary branch
+  @g.checkout OPTS[:BASE_BRANCH]
+  branch.delete rescue nil
+  raise
+end
+
+
+
