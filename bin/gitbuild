@@ -28,7 +28,7 @@ INFO_FILEPATH   = './config/gitbuild.txt'
 # Command line arguments
 
 OptionParser.new{ |op|
-  op.banner = "Creates a new branch, merging pull requests in GitHub marked with #{PULL_TAG}"
+  op.banner = "Creates a new build branch, merging pull requests in GitHub marked with #build."
   op.on('-l', '--login USERNAME',         'GitHub login name'                                        ) { |v|
                                           OPTS[:GITHUB_LOGIN]     = v }
   op.on('-p', '--password PASSWORD',      'GitHub login password'                                    ) { |v|

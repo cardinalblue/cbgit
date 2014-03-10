@@ -20,7 +20,7 @@ OPTS = {
 # Command line arguments
 
 OptionParser.new{ |op|
-  op.banner = "Generates graph of pull requests"
+  op.banner = "Generates graph of pull requests to `/tmp/<reponame>.svg`."
   op.on('-l', '--login USERNAME',         'GitHub login name'                                        ) { |v|
     OPTS[:GITHUB_LOGIN]     = v }
   op.on('-p', '--password PASSWORD',      'GitHub login password'                                    ) { |v|
