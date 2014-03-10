@@ -17,7 +17,7 @@ To install the Ruby gem from the source:
     cd cbgit
     rake install
 
-To instlal the Ruby gem directly from GitHub using the `specific_install` gem:
+To install the Ruby gem directly from GitHub using the `specific_install` gem:
 
     gem install specific_install
     gem specific_install -l https://github.com/cardinalblue/cbgit.git
