@@ -9,6 +9,8 @@ require 'pp'
 require 'json'
 
 OPTS = {
+  BUILD_NAME:       'build',
+
   GITHUB_LOGIN:     ENV['GITHUB_LOGIN'],
   GITHUB_PASSWORD:  ENV['GITHUB_PASSWORD'],
 
@@ -16,19 +18,21 @@ OPTS = {
   REMOTE:           'origin',
 
   OCTOPUS_MERGE:    true,
-  BUILD_PREFIX:     'build_',
   DO_PUSH:          true,
   AFTER_MERGE:      false,
 }
 
-PULL_TAG        = /\#build\b/
 INFO_FILEPATH   = './config/gitbuild.txt'
 
 # --------------------------------------------------
 # Command line arguments
 
 OptionParser.new{ |op|
-  op.banner = "Creates a new build branch, merging pull requests in GitHub marked with #build."
+  op.banner = <<-TEXT
+Creates a new build branch, merging pull requests in GitHub marked with #build.
+Usage: gitbuild [name (defaults to 'build')] [options]
+
+  TEXT
   op.on('-l', '--login USERNAME',         'GitHub login name'                                        ) { |v|
                                           OPTS[:GITHUB_LOGIN]     = v }
   op.on('-p', '--password PASSWORD',      'GitHub login password'                                    ) { |v|
@@ -39,8 +43,6 @@ OptionParser.new{ |op|
                                           OPTS[:REMOTE]           = v }
   op.on('-o', '--[no-]octopus',           "Use Git octopus merge (def #{OPTS[:OCTOPUS_MERGE]})"      ) { |v|
                                           OPTS[:OCTOPUS_MERGE]    = v }
-  op.on('--build-prefix BUILDPREFIX',     "Name of branch created (def #{OPTS[:BUILD_PREFIX]}123)"   ) { |v|
-                                          OPTS[:BUILD_PREFIX]     = v }
   op.on('--[no-]push',                    "Push results to remote (def #{OPTS[:DO_PUSH]}"            ) { |v|
                                           OPTS[:DO_PUSH]          = v }
   op.on('--after-merge',                  "Merge completed manually, do post (def #{OPTS[:AFTER_MERGE]}" ) { |v|
@@ -53,6 +55,8 @@ OptionParser.new{ |op|
   end
 }.parse!
 
+# Whatever is left in ARGV is the required normal arguments
+OPTS[:BUILD_NAME] = ARGV.pop unless ARGV.empty?
 
 # --------------------------------------------------
 # Setup Git client
@@ -95,16 +99,24 @@ def calculate_github_repo
   return "#{repo_user}/#{repo_name}"
 end
 
+def build_prefix
+  "#{OPTS[:BUILD_NAME]}_"
+end
+
 def calculate_build_number
   @g.branches.inject 0 do |build_number, branch|
-    if branch.name.start_with? OPTS[:BUILD_PREFIX]
-      n = branch.name[OPTS[:BUILD_PREFIX].length..-1].to_i
+    if branch.name.start_with? build_prefix
+      n = /\d+/.match(branch.name[build_prefix.length..-1])[0].to_i
       if n > build_number
         build_number = n
       end
     end
     build_number
   end
+end
+
+def pull_tag_regex
+  /\B\##{OPTS[:BUILD_NAME]}\b/
 end
 
 # --------------------------------------------------
@@ -118,7 +130,7 @@ begin
 
   # Figure out branches we will merge, by looking for the magic tag
   pulls = fetch_github_pulls
-  pulls = pulls.select{ |pull| pull.body.match PULL_TAG }
+  pulls = pulls.select{ |pull| pull.body.match pull_tag_regex }
   raise 'No pull requests to merge!' if pulls.empty?
   brnames = pulls.map{ |b| b.head.ref }
   puts "---- Found Github branches to build:\n#{brnames.join "\n" }"
@@ -162,7 +174,7 @@ begin
   puts "---- Current build number is #{build_number}"
 
   # Rename current branch to it
-  buildbranch = "#{OPTS[:BUILD_PREFIX]}#{build_number + 1}"
+  buildbranch = "#{build_prefix}#{build_number + 1}"
   puts "---- Creating branch #{buildbranch}"
   git :branch, '-m', buildbranch
 
