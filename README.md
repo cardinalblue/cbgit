@@ -1,29 +1,28 @@
 # Cbgit
 
-TODO: Write a gem description
+Collection of Git/GitHub related utility scripts packaged as a Ruby Gem.
+
+- gitbuild
+- gitpullgraph
 
 ## Installation
 
-Add this line to your application's Gemfile:
+In Rails, add this line to your application's Gemfile:
 
-    gem 'cbgit'
+    gem 'cbgit', git: 'https://github.com/cardinalblue/cbgit.git'
 
-And then execute:
+To install the Ruby gem from the source:
 
-    $ bundle
+    git clone https://github.com/cardinalblue/cbgit.git
+    cd cbgit
+    rake install
 
-Or install it yourself as:
+To install the Ruby gem directly from GitHub using the `specific_install` gem:
 
-    $ gem install cbgit
+    gem install specific_install
+    gem specific_install -l https://github.com/cardinalblue/cbgit.git
 
 ## Usage
 
-TODO: Write usage instructions here
+Run scripts with `--help`
 
-## Contributing
-
-1. Fork it ( http://github.com/<my-github-username>/cbgit/fork )
-2. Create your feature branch (`git checkout -b my-new-feature`)
-3. Commit your changes (`git commit -am 'Add some feature'`)
-4. Push to the branch (`git push origin my-new-feature`)
-5. Create new Pull Request
