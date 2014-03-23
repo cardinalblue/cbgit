@@ -122,10 +122,6 @@ end
 # --------------------------------------------------
 # MAIN SCRIPT
 
-# First, got to base branch and pull it
-@g.checkout OPTS[:BASE_BRANCH]
-@g.pull OPTS[:REMOTE], OPTS[:BASE_BRANCH]
-
 begin
 
   # Figure out branches we will merge, by looking for the magic tag
@@ -136,6 +132,10 @@ begin
   puts "---- Found Github branches to build:\n#{brnames.join "\n" }"
 
   unless OPTS[:AFTER_MERGE]
+
+    # First, got to base branch and pull it
+    @g.checkout OPTS[:BASE_BRANCH]
+    @g.pull OPTS[:REMOTE], OPTS[:BASE_BRANCH]
 
     # Then create a new branch and switch to it
     branch = @g.branch("tmp_#{rand 1_000_000_000_000}")
