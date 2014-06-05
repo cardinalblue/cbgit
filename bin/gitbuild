@@ -110,6 +110,7 @@ def calculate_build_number
   @g.branches.inject 0 do |build_number, branch|
     if branch.name.start_with? build_prefix
       n = /\d+/.match(branch.name[build_prefix.length..-1])[0].to_i
+      puts "Existing branch #{branch.name} (#{build_number})" if OPTS[:BUILD_NUMBER]
       if n > build_number
         build_number = n
       end
