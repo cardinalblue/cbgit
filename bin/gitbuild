@@ -20,6 +20,7 @@ OPTS = {
   OCTOPUS_MERGE:    true,
   DO_PUSH:          true,
   AFTER_MERGE:      false,
+  BUILD_NUMBER:     false,
 }
 
 INFO_FILEPATH   = './config/gitbuild.txt'
@@ -37,12 +38,14 @@ Usage: gitbuild [name (defaults to 'build')] [options]
                                           OPTS[:GITHUB_LOGIN]     = v }
   op.on('-p', '--password PASSWORD',      'GitHub login password'                                    ) { |v|
                                           OPTS[:GITHUB_PASSWORD]  = v }
-  op.on('-b', '--basebranch BRANCHNAME',  "Branch to use as base (def #{OPTS[:BASE_BRANCH]})"        ) { |v|
+  op.on('-b', '--base-branch BRANCHNAME',  "Branch to use as base (def #{OPTS[:BASE_BRANCH]})"        ) { |v|
                                           OPTS[:BASE_BRANCH]      = v }
   op.on('-r', '--remote REMOTENAME',      "Git remote used to find GitHub (def #{OPTS[:REMOTE]})"    ) { |v|
                                           OPTS[:REMOTE]           = v }
   op.on('-o', '--[no-]octopus',           "Use Git octopus merge (def #{OPTS[:OCTOPUS_MERGE]})"      ) { |v|
                                           OPTS[:OCTOPUS_MERGE]    = v }
+  op.on('-n', '--build-number',           "Just display build number info"                           ) { |v|
+                                          OPTS[:BUILD_NUMBER]     = v }
   op.on('--[no-]push',                    "Push results to remote (def #{OPTS[:DO_PUSH]}"            ) { |v|
                                           OPTS[:DO_PUSH]          = v }
   op.on('--after-merge',                  "Merge completed manually, do post (def #{OPTS[:AFTER_MERGE]}" ) { |v|
@@ -124,6 +127,19 @@ end
 
 begin
 
+  # --------------------------------------------------------------------
+  # Figure out build number
+  build_number = calculate_build_number
+  puts "---- Current build number is #{build_number}"
+
+  # Rename current branch to it
+  buildbranch = "#{build_prefix}#{build_number + 1}"
+  if OPTS[:BUILD_NUMBER]
+    puts "---- Next build is `#{buildbranch}`"
+    exit
+  end
+
+  # --------------------------------------------------------------------
   # Figure out branches we will merge, by looking for the magic tag
   pulls = fetch_github_pulls
   pulls = pulls.select{ |pull| pull.body.match pull_tag_regex }
@@ -169,12 +185,7 @@ begin
   end
 
   # --------------------------------------------------------------------
-  # Figure out build number
-  build_number = calculate_build_number
-  puts "---- Current build number is #{build_number}"
-
-  # Rename current branch to it
-  buildbranch = "#{build_prefix}#{build_number + 1}"
+  # Create branch
   puts "---- Creating branch #{buildbranch}"
   git :branch, '-m', buildbranch
 
