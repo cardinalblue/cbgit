@@ -88,10 +88,11 @@ def git command, *args
   @g.lib.send :command, command, args
 end
 
+PULLS_LIMIT = 1000
 def fetch_github_pulls repo=calculate_github_repo
   # Access pull requests
   @logger.debug "Fetching pull requests from #{repo}"
-  pulls = Octokit.pulls(repo, 'open')
+  pulls = Octokit.pulls(repo, state: :open, per_page: PULLS_LIMIT)
 end
 
 def calculate_github_repo
