@@ -88,20 +88,36 @@ def git command, *args
   @g.lib.send :command, command, args
 end
 
-ISSUES_LIMIT = 1000
-def fetch_github_pulls repo
-  # Access pull requests via issues API, because PRs API does not expose labels
-  # but the issues API does. Technically, all the PRs are issues, so we just 
-  # pull all the issues and sort the ones that are not PRs out.
-  @logger.debug "Fetching pull requests from #{repo}"
-  Octokit.issues(repo, state: :open, per_page: ISSUES_LIMIT)
-         .select { |i| i[:pull_request] }
+# Current facts about the Github API:
+#   * Pull requests API does not expose the labels.
+#   * All pull requests are issues.
+#   * Issues API does not expose the branch name of related pull request.
+#
+# Thus in order to get a list of pull requests with a given label, we need to 
+# fetch the list of issues first, then select only those which are pull requests
+# marked with the build label and map their numbers. Then we have to call the 
+# actual PRs API and select the ones matching the above numbers.
+#
+ITEMS_LIMIT = 10000
+
+def fetch_github_issues repo
+  @logger.debug "Fetching issues from #{repo}"
+  Octokit.issues(repo, state: :open, per_page: ITEMS_LIMIT)
 end
 
-def fetch_github_pulls_to_build repo=calculate_github_repo
-  fetch_github_pulls(repo).select { |pull|
-    pull[:labels].find { |label| label[:name] == OPTS[:BUILD_NAME] }
-  }
+def fetch_github_build_pulls_numbers repo
+  fetch_github_issues(repo).select { |i|
+    i[:pull_request] && i[:labels].find { |label| 
+      label[:name] == OPTS[:BUILD_NAME]
+    }
+  }.map(&:number)
+end
+
+def fetch_github_build_pulls repo=calculate_github_repo
+  numbers = fetch_github_build_pulls_numbers(repo).to_set
+  @logger.debug "Fetching pull requests from #{repo}"
+  all_pulls = Octokit.pulls(repo, state: :open, per_page: ITEMS_LIMIT)
+  all_pulls.select{|p| numbers.include? p.number }
 end
 
 def calculate_github_repo
@@ -148,7 +164,7 @@ begin
 
   # --------------------------------------------------------------------
   # Figure out branches we will merge, by looking for the magic tag
-  pulls = fetch_github_pulls_to_build
+  pulls = fetch_github_build_pulls
   raise 'No pull requests to merge!' if pulls.empty?
   brnames = pulls.map{ |b| b.head.ref }
   puts "---- Found Github branches to build:\n#{brnames.join "\n" }"
