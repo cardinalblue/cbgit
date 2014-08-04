@@ -98,7 +98,7 @@ end
 # marked with the build label and map their numbers. Then we have to call the 
 # actual PRs API and select the ones matching the above numbers.
 #
-ITEMS_LIMIT = 1000
+ITEMS_LIMIT = 10000
 
 def fetch_github_issues repo
   @logger.debug "Fetching issues from #{repo}"
@@ -114,27 +114,11 @@ def fetch_github_build_pulls_numbers repo
 end
 
 def fetch_github_build_pulls repo=calculate_github_repo
-  numbers = fetch_github_build_pulls_numbers(repo)
+  numbers = fetch_github_build_pulls_numbers(repo).to_set
   @logger.debug "Fetching pull requests from #{repo}"
   all_pulls = Octokit.pulls(repo, state: :open, per_page: ITEMS_LIMIT)
-  select_pulls_by_numbers(all_pulls, numbers)
+  all_pulls.select{|p| numbers.include? p.number }
 end
-
-# Loop optimization
-#
-def select_pulls_by_numbers pulls, numbers, acc=[]
-  return acc if numbers.empty?
-  raise 'Could not find all the pull requests with given numbers' \
-    if pulls.empty?
-  
-  pull = pulls.shift
-  if numbers.index pull.number
-    acc << pull
-    numbers.delete pull.number
-  end
-  
-  select_pulls_by_numbers pulls, numbers, acc
-end 
 
 def calculate_github_repo
   # Figure out the repo user/name
