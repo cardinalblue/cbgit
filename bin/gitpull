@@ -1,0 +1,85 @@
+#!/usr/bin/env ruby
+
+require 'octokit'
+require 'git'
+require 'graph'
+require 'logger'
+
+require 'optparse'
+require 'pp'
+require 'json'
+
+OPTS = {
+    GITHUB_LOGIN:     ENV['GITHUB_LOGIN'],
+    GITHUB_PASSWORD:  ENV['GITHUB_PASSWORD'],
+
+    REMOTE:           'origin',
+}
+
+# --------------------------------------------------
+# Command line arguments
+
+OptionParser.new{ |op|
+  op.banner = "Checkouts the correct branch for a given pull request"
+  op.on('-l', '--login USERNAME',         'GitHub login name'                                        ) { |v|
+    OPTS[:GITHUB_LOGIN]     = v }
+  op.on('-p', '--password PASSWORD',      'GitHub login password'                                    ) { |v|
+    OPTS[:GITHUB_PASSWORD]  = v }
+  op.on('-r', '--remote REMOTENAME',      "Git remote used to find GitHub (def #{OPTS[:REMOTE]})"    ) { |v|
+    OPTS[:REMOTE]           = v }
+
+  # Help
+  op.on_tail("-h", "--help", "Show this message") do
+    puts op
+    exit
+  end
+}.parse!
+
+
+# --------------------------------------------------
+# Setup Git client
+
+@logger = Logger.new STDOUT
+@g      = Git.open '.', log: nil  # or @logger
+
+# --------------------------------------------------
+# Setup Octokit
+
+Octokit.configure do |config|
+  config.login    = OPTS[:GITHUB_LOGIN]    or raise 'No GitHub login given'
+  config.password = OPTS[:GITHUB_PASSWORD] or raise 'No GitHub password given'
+end
+stack = Faraday::Builder.new do |builder|
+  #builder.response :post
+  builder.use Octokit::Response::RaiseError
+  builder.adapter Faraday.default_adapter
+end
+Octokit.middleware = stack
+
+# --------------------------------------------------
+# Functions
+
+def git command, *args
+  @g.lib.send :command, command, args
+end
+
+def fetch_github_pulls repo=calculate_github_repo
+  # Access pull requests
+  # @logger.debug "Fetching pull requests from #{repo}"
+  pulls = Octokit.pulls(repo)
+end
+
+def calculate_github_repo
+  # Figure out the repo user/name
+  remote = @g.remote OPTS[:REMOTE]
+  repo_user, repo_name = remote.url.split(/[\/\.\:]/)[-3..-2]
+  # @logger.info "Extracted repo user '#{repo_user}' name '#{repo_name}' from remote '#{OPTS[:REMOTE]}' (#{remote.url})"
+  return "#{repo_user}/#{repo_name}"
+end
+
+# -------------------------------------------------
+# MAIN SCRIPT
+
+# Figure out branches we will merge, by looking for the magic tag
+pulls = fetch_github_pulls
+pp pulls
