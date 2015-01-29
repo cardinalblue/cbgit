@@ -74,7 +74,7 @@ Octokit.configure do |config|
   config.login    = OPTS[:GITHUB_LOGIN]    or raise 'No GitHub login given'
   config.password = OPTS[:GITHUB_PASSWORD] or raise 'No GitHub password given'
 end
-stack = Faraday::Builder.new do |builder|
+stack = Faraday::RackBuilder.new do |builder|
   #builder.response :post
   builder.use Octokit::Response::RaiseError
   builder.adapter Faraday.default_adapter

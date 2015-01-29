@@ -19,8 +19,9 @@ OPTS = {
 # --------------------------------------------------
 # Command line arguments
 
-OptionParser.new{ |op|
-  op.banner = "Generates graph of pull requests to `/tmp/<reponame>.svg`."
+optionparser = OptionParser.new{ |op|
+  op.banner = "Checkouts the correct branch for a given pull request\n" +
+              'Usage: gitpull [options] <PR#>'
   op.on('-l', '--login USERNAME',         'GitHub login name'                                        ) { |v|
     OPTS[:GITHUB_LOGIN]     = v }
   op.on('-p', '--password PASSWORD',      'GitHub login password'                                    ) { |v|
@@ -29,12 +30,17 @@ OptionParser.new{ |op|
     OPTS[:REMOTE]           = v }
 
   # Help
-  op.on_tail("-h", "--help", "Show this message") do
+  op.on_tail('-h', '--help', 'Show this message') do
     puts op
     exit
   end
-}.parse!
+}
+optionparser.parse!
 
+OPTS[:PULL_REQUEST_NUMBER] = (Integer(ARGV.pop) rescue nil) or begin
+  puts optionparser
+  exit -1
+end
 
 # --------------------------------------------------
 # Setup Git client
@@ -63,73 +69,51 @@ def git command, *args
   @g.lib.send :command, command, args
 end
 
-def fetch_github_pulls repo=calculate_github_repo
-  # Access pull requests
-  # @logger.debug "Fetching pull requests from #{repo}"
-  pulls = Octokit.pulls(repo, 'open')
-end
-
 def calculate_github_repo
-  # Figure out the repo user/name
   remote = @g.remote OPTS[:REMOTE]
   repo_user, repo_name = remote.url.split(/[\/\.\:]/)[-3..-2]
   # @logger.info "Extracted repo user '#{repo_user}' name '#{repo_name}' from remote '#{OPTS[:REMOTE]}' (#{remote.url})"
   return "#{repo_user}/#{repo_name}"
 end
 
-# --------------------------------------------------
-# Monkeypatches
+def fetch_pulls repo=calculate_github_repo
+  # @logger.debug "Fetching pull requests from #{repo}"
+  cache_pulls(Octokit.pulls(repo))
+end
 
-# Patch graph to support adding URL and target to things
-class Graph::Thingy
-  def url v
-    attributes.reject! { |s| s =~ /^URL =/ }
-    attributes << "URL = #{Graph.escape_label v}"
-  end
-  def target v
-    attributes.reject! { |s| s =~ /^target =/ }
-    attributes << "target = #{Graph.escape_label v}"
-  end
-  def tooltip v
-    attributes.reject! { |s| s =~ /^tooltip =/ }
-    attributes << "tooltip = #{Graph.escape_label v}"
+def cache_pulls pulls
+  # @logger.debug "Writing pulls cache: #{pulls}"
+  File.write('./.gitpull_cached', pulls.map{|p| p.to_attrs }.to_json )
+  pulls
+end
+def cached_pulls
+  @cached_pulls ||= begin
+    f = File.read('./.gitpull_cached') rescue nil
+    # @logger.debug "Read pulls cache: #{f.to_s}" if f
+    JSON.parse(f) if f
   end
 end
+def cached_pulls!
+  @logger.debug 'Clearing pulls cache'
+  @cached_pulls = nil
+  cached_pulls
+end
+
+def extract_pull pulls, pullnum
+  pulls.find{|p| p['number'] == pullnum }
+end
+
 
 # -------------------------------------------------
 # MAIN SCRIPT
 
-# Figure out branches we will merge, by looking for the magic tag
-pulls = fetch_github_pulls
-raise 'No pull requests to merge!' if pulls.empty?
-brnames = pulls.map{ |b| b.head.ref }
-puts "---- Found Github branches to build:\n#{brnames.join "\n" }"
+# ---- Get the pull branch
+pullno = OPTS[:PULL_REQUEST_NUMBER]
+pull = (cached_pulls && extract_pull(cached_pulls, pullno)) or
+       (extract_pull(fetch_pulls, pullno)) or
+       raise "Pull number #{pullno} NOT FOUND"
+# @logger.debug "Found pull: #{pull}"
 
-# Generate graph
-repo = calculate_github_repo
-filename = "/tmp/#{ repo.gsub /\W/, '_' }"
-digraph repo do
-  orient 'LR'  # "Left Right", see http://www.graphviz.org/doc/info/attrs.html
-
-  pulls.each do |pull|
-
-    # Edge attributes
-    e = edge(pull.head.ref, pull.base.ref)
-    e.label   "##{pull.number.to_s}"
-    e.url     pull.attrs[:_links][:html][:href]
-    e.target  '_blank'
-    e.tooltip pull.body
-
-    # Node attributes
-    n = node(pull.head.ref)
-    n.attributes << filled << rectangle << rounded
-
-  end
-
-  save filename, 'svg'
-end
-
-# Open in browser
-`open -a Safari #{filename}.svg`
-
-
+# Switch to that branch
+branch = pull['head']['ref'] or "Unable to determine branch: #{pull}"
+git 'checkout', branch
