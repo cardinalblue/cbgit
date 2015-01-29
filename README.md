@@ -22,7 +22,11 @@ To install the Ruby gem directly from GitHub using the `specific_install` gem:
     gem install specific_install
     gem specific_install -l https://github.com/cardinalblue/cbgit.git
 
-## Usage
+## Commands
+
+    gitbuild
+    gitpullgraph
+    gitpull
 
 Run scripts with `--help`
 
