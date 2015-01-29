@@ -9,6 +9,9 @@ require 'optparse'
 require 'pp'
 require 'json'
 
+require 'active_support'
+require 'active_support/core_ext'
+
 OPTS = {
     GITHUB_LOGIN:     ENV['GITHUB_LOGIN'],
     GITHUB_PASSWORD:  ENV['GITHUB_PASSWORD'],
@@ -77,20 +80,21 @@ def calculate_github_repo
 end
 
 def fetch_pulls repo=calculate_github_repo
-  # @logger.debug "Fetching pull requests from #{repo}"
-  cache_pulls(Octokit.pulls(repo))
+  @logger.debug "Fetching pull requests from #{repo}"
+  pulls = Octokit.pulls(repo).map{|p| p.to_attrs.with_indifferent_access }  # Convert from Sawyer::Resources to Hashes
+  cache_pulls(pulls)
 end
 
 def cache_pulls pulls
-  # @logger.debug "Writing pulls cache: #{pulls}"
-  File.write('./.gitpull_cached', pulls.map{|p| p.to_attrs }.to_json )
+  @logger.debug "Writing pulls cache"
+  File.write('./.gitpull_cached', pulls.to_json )
   pulls
 end
 def cached_pulls
   @cached_pulls ||= begin
     f = File.read('./.gitpull_cached') rescue nil
     # @logger.debug "Read pulls cache: #{f.to_s}" if f
-    JSON.parse(f) if f
+    JSON.parse(f).map{|p| p.with_indifferent_access } if f
   end
 end
 def cached_pulls!
@@ -107,13 +111,16 @@ end
 # -------------------------------------------------
 # MAIN SCRIPT
 
+pullnum = OPTS[:PULL_REQUEST_NUMBER]
+puts "Switching to Pull Request #{pullnum}"
+
 # ---- Get the pull branch
-pullno = OPTS[:PULL_REQUEST_NUMBER]
-pull = (cached_pulls && extract_pull(cached_pulls, pullno)) or
-       (extract_pull(fetch_pulls, pullno)) or
-       raise "Pull number #{pullno} NOT FOUND"
+pull = (cached_pulls && extract_pull(cached_pulls, pullnum)) ||
+       (extract_pull(fetch_pulls, pullnum)) or
+       raise "Pull number #{pullnum} NOT FOUND"
 # @logger.debug "Found pull: #{pull}"
 
 # Switch to that branch
 branch = pull['head']['ref'] or "Unable to determine branch: #{pull}"
+puts "Branch #{branch}"
 git 'checkout', branch
