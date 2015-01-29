@@ -87,12 +87,12 @@ end
 
 def cache_pulls pulls
   @logger.debug "Writing pulls cache"
-  File.write('./.gitpull_cached', pulls.to_json )
+  File.write('.git/.gitpull_cached', pulls.to_json )
   pulls
 end
 def cached_pulls
   @cached_pulls ||= begin
-    f = File.read('./.gitpull_cached') rescue nil
+    f = File.read('.git/.gitpull_cached') rescue nil
     # @logger.debug "Read pulls cache: #{f.to_s}" if f
     JSON.parse(f).map{|p| p.with_indifferent_access } if f
   end
