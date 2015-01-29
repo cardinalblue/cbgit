@@ -12,6 +12,7 @@ Gem::Specification.new do |spec|
   spec.description   = <<-DESCRIPTION
   - gitbuild         Build Pull Requests marked with #build
   - gitpullgraph     Generate /tmp/gitpullgraph.svg diagram of Pull Requests
+  - gitpull          Switch to a branch given a pull request #
   DESCRIPTION
   
   spec.homepage      = ""
