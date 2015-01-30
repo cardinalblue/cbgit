@@ -71,8 +71,13 @@ OPTS[:BUILD_NAME] = ARGV.pop unless ARGV.empty?
 # Setup Octokit
 
 Octokit.configure do |config|
-  config.login    = OPTS[:GITHUB_LOGIN]    or raise 'No GitHub login given'
-  config.password = OPTS[:GITHUB_PASSWORD] or raise 'No GitHub password given'
+  if OPTS[:GITHUB_LOGIN] || OPTS[:GITHUB_PASSWORD]
+    config.login    = OPTS[:GITHUB_LOGIN]    or raise 'No GitHub login given'
+    config.password = OPTS[:GITHUB_PASSWORD] or raise 'No GitHub password given'
+  else
+    # See https://github.com/octokit/octokit.rb#using-a-netrc-file
+    config.netrc = true
+  end
 end
 stack = Faraday::RackBuilder.new do |builder|
   #builder.response :post
