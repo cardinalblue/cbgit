@@ -86,7 +86,7 @@ end
 
 def fetch_pulls repo=calculate_github_repo
   @logger.debug "Fetching pull requests from #{repo}"
-  pulls = Octokit.pulls(repo).map{|p| p.to_attrs.with_indifferent_access }  # Convert from Sawyer::Resources to Hashes
+  pulls = Octokit.pulls(repo, state: :all).map{|p| p.to_attrs.with_indifferent_access }  # Convert from Sawyer::Resources to Hashes
   cache_pulls(pulls)
 end
 
