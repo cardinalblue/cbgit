@@ -28,7 +28,7 @@ Gem::Specification.new do |spec|
   # General
   spec.add_runtime_dependency     "json"
   spec.add_runtime_dependency     "logger"
-  spec.add_runtime_dependency     "netrc", "~> 0.10"
+  spec.add_runtime_dependency     "netrc", "0.7.8"
   
   # Git
   spec.add_runtime_dependency     "octokit"
