@@ -71,7 +71,7 @@ end
 def fetch_github_pulls repo=calculate_github_repo
   # Access pull requests
   # @logger.debug "Fetching pull requests from #{repo}"
-  pulls = Octokit.pulls(repo, 'open')
+  pulls = Octokit.pulls(repo, state: :open)
 end
 
 def calculate_github_repo
