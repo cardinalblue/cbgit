@@ -79,12 +79,6 @@ Octokit.configure do |config|
     config.netrc = true
   end
 end
-stack = Faraday::RackBuilder.new do |builder|
-  #builder.response :post
-  builder.use Octokit::Response::RaiseError
-  builder.adapter Faraday.default_adapter
-end
-Octokit.middleware = stack
 
 # --------------------------------------------------
 # Functions
