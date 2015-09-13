@@ -80,6 +80,16 @@ Octokit.configure do |config|
   end
 end
 
+# This middleware causes Octokit to malfunction. Not sure if we need it.
+# Let's comment this out until we figure it out.
+#
+# stack = Faraday::RackBuilder.new do |builder|
+#   #builder.response :post
+#   builder.use Octokit::Response::RaiseError
+#   builder.adapter Faraday.default_adapter
+# end
+# Octokit.middleware = stack
+
 # --------------------------------------------------
 # Functions
 
