@@ -168,6 +168,16 @@ begin
   end
 
   # --------------------------------------------------------------------
+  # Fetch user for who creating the release
+  begin
+    user = Octokit.user
+  rescue
+    puts '---- Cannot login to GitHub'
+    puts '---- Check your .netrc or env variables GITHUB_LOGIN and GITHUB_PASSWORD'
+    exit
+  end
+
+  # --------------------------------------------------------------------
   # Figure out branches we will merge, by looking for the magic tag
   pulls = fetch_github_build_pulls
   raise 'No pull requests to merge!' if pulls.empty?
@@ -221,7 +231,7 @@ begin
   info = {
     branch:           buildbranch,
     time:             Time.now,
-    github_login:     OPTS[:GITHUB_LOGIN],
+    github_login:     user.name || OPTS[:GITHUB_LOGIN],
     commit: {
       sha:            @g.log.first.sha,
     },
