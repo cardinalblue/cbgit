@@ -113,6 +113,7 @@ def extract_pull pulls, pullnum
 end
 
 def fetch_pull pullnum, repo=calculate_github_repo
+  @logger.debug "Fetchind individual pull #{pullnum}"
   Octokit.pull(repo, pullnum).to_attrs.with_indifferent_access rescue nil
 end
 
@@ -120,12 +121,12 @@ end
 # MAIN SCRIPT
 
 pullnum = OPTS[:PULL_REQUEST_NUMBER]
-puts "Switching to Pull Request #{pullnum}"
+puts "Switching to Pull Request #{pullnum}..."
 
 # ---- Get the pull branch
-pull = (cached_pulls && extract_pull(cached_pulls, pullnum)) ||
-       (extract_pull(fetch_pulls, pullnum)) or
-       fetch_pull(pullnum) or
+pull = ((cached_pulls && extract_pull(cached_pulls, pullnum)) ||
+        (extract_pull(fetch_pulls, pullnum)) ||
+        fetch_pull(pullnum)) or
        raise "Pull number #{pullnum} NOT FOUND"
 # @logger.debug "Found pull: #{pull}"
 
