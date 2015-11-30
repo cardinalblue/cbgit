@@ -112,6 +112,9 @@ def extract_pull pulls, pullnum
   pulls.find{|p| p['number'] == pullnum }
 end
 
+def fetch_pull pullnum, repo=calculate_github_repo
+  Octokit.pull(repo, pullnum).to_attrs.with_indifferent_access rescue nil
+end
 
 # -------------------------------------------------
 # MAIN SCRIPT
@@ -122,8 +125,10 @@ puts "Switching to Pull Request #{pullnum}"
 # ---- Get the pull branch
 pull = (cached_pulls && extract_pull(cached_pulls, pullnum)) ||
        (extract_pull(fetch_pulls, pullnum)) or
+       fetch_pull(pullnum) or
        raise "Pull number #{pullnum} NOT FOUND"
 # @logger.debug "Found pull: #{pull}"
+
 
 # Switch to that branch
 branch = pull['head']['ref'] or "Unable to determine branch: #{pull}"
