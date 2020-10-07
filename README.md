@@ -7,26 +7,26 @@ Collection of Git/GitHub related utility scripts packaged as a Ruby Gem.
 
 ## Installation
 
-First have to install the graphviz software:
+1. Install the graphviz software:
 
     brew install graphviz
 
-Then install the `cbgit` gem:
+2. Install the `cbgit` gem:
+```
+ git clone https://github.com/cardinalblue/cbgit.git
+ cd cbgit
+ rake install
+ ```
 
-If you'd like to install the gem from the source:
+3. Make sure the Ruby version inside your locally installed cbgit is the same as the main server’s (rbenv local <version desired>).
+4. On Github, go to settings -> Developer settings -> Personal access tokens -> Hit 'generate new token' -> Name as you wish, allow User and Repo. -> Copy the generated string.
+5. (Create and) Open .netrc file at home directory and paste the following:
 
-    git clone https://github.com/cardinalblue/cbgit.git
-    cd cbgit
-    rake install
-
-Altenatively, if using Rails, add this line to your application's Gemfile:
-
-    gem 'cbgit', git: 'https://github.com/cardinalblue/cbgit.git'
-
-Otherwise, to install the Ruby gem directly from GitHub using the `specific_install` gem:
-
-    gem install specific_install
-    gem specific_install -l https://github.com/cardinalblue/cbgit.git
+```
+machine api.github.com
+login [YOUR GITHUB USERNAME]
+password [THE THING YOU JUST COPIED]
+```
 
 ## Usage
 
