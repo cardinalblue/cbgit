@@ -8,8 +8,9 @@ Collection of Git/GitHub related utility scripts packaged as a Ruby Gem.
 ## Installation
 
 1. Install the graphviz software:
-
-    brew install graphviz
+```
+brew install graphviz
+```
 
 2. Install the `cbgit` gem:
 ```
